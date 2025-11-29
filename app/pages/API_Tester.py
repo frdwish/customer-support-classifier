@@ -1,0 +1,21 @@
+import streamlit as st
+import requests
+
+API_URL = "http://127.0.0.1:8000/predict"
+
+st.title("🧪 API Tester")
+st.write("Send live requests to the FastAPI backend.")
+
+subject = st.text_input("Subject")
+description = st.text_area("Description")
+product = st.text_input("Product (optional)")
+
+if st.button("Test API"):
+    payload = {
+        "ticket_subject": subject,
+        "ticket_description": description,
+        "product_purchased": product or None
+    }
+    with st.spinner("Calling API..."):
+        res = requests.post(API_URL, json=payload)
+        st.json(res.json())

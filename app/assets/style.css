@@ -1,0 +1,32 @@
+/* Global UI Styling */
+body {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Custom container */
+.stApp {
+    background: linear-gradient(135deg, #0f0f0f, #1d1f27);
+    color: #ffffff;
+}
+
+/* Cards */
+.card {
+    padding: 20px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
+    margin-bottom: 20px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.stButton button {
+    background: linear-gradient(90deg, #6a11cb, #2575fc);
+    color: white;
+    border-radius: 8px;
+    padding: 10px 18px;
+    border: none;
+    font-size: 16px;
+}
+
+.stButton button:hover {
+    opacity: 0.8;
+}
