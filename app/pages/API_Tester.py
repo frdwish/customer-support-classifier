@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "http://127.0.0.1:8000/predict"
+API_URL = "https://customer-support-classifier.onrender.com/predict"
 
 st.title("🧪 API Tester")
 st.write("Send live requests to the FastAPI backend.")
@@ -16,6 +16,13 @@ if st.button("Test API"):
         "ticket_description": description,
         "product_purchased": product or None
     }
-    with st.spinner("Calling API..."):
-        res = requests.post(API_URL, json=payload)
-        st.json(res.json())
+    try:
+        response = requests.post(API_URL, json=payload, timeout=10)
+        response.raise_for_status()
+        result = response.json()
+        st.success(f"Predicted Ticket Type: **{result['ticket_type']}**")
+        if "confidence" in result:
+            st.write(f"Confidence: {result['confidence']:.2f}")
+    except Exception as e:
+        st.error("Failed to reach API. Make sure the Render API is live.")
+        st.write(e)
