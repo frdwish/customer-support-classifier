@@ -175,3 +175,12 @@ Performed inside notebooks/EDA.ipynb.
 
 ***Output:***
 - technical issue
+
+### App Screenshots
+
+**Ticket Prediction**
+
+![App Dashboard](App_Dashboard.png)
+
+
+
