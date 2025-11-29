@@ -1,8 +1,7 @@
 import streamlit as st
 import requests
 
-API_URL = "https://customer-support-classifier.onrender.com/predict"
-
+API_URL = "http://127.0.0.1:8000/predict"
 st.title("🧪 API Tester")
 st.write("Send live requests to the FastAPI backend.")
 
