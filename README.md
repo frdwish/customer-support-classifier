@@ -153,7 +153,7 @@ Performed inside notebooks/EDA.ipynb.
 
 ## 🛠Installation Steps
 
-***Installing requirements
+***Installing requirements***
 - python -m venv venv
 - source venv/bin/activate     # mac
 - pip install -r requirements.txt
