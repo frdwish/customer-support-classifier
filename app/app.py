@@ -1,122 +1,104 @@
 import streamlit as st
-import requests
-import pandas as pd
 import pickle
 import os
+import matplotlib.pyplot as plt
 
-API_URL = "http://127.0.0.1:8000/predict"
 
-# --- Page Config ---
-st.set_page_config(
-    page_title="Customer Support Ticket Classifier",
-    layout="wide",
-    page_icon="🎫"
-)
+# Load Model & Vectorizer Once
 
-st.title("🎫 Customer Support Ticket Classifier")
-st.markdown("A production-grade NLP model to classify customer support tickets.")
+MODEL_PATH = os.path.join("models", "model.pkl")
+VEC_PATH = os.path.join("models", "vectorizer.pkl")
 
-# --- Load Model Accuracy Dynamically ---
-try:
-    with open("models/model.pkl", "rb") as f:
+@st.cache_resource
+def load_artifacts():
+    with open(MODEL_PATH, "rb") as f:
         model = pickle.load(f)
-    y_accuracy = 0.85  # Replace with dynamic accuracy if saved
-except FileNotFoundError:
-    st.warning("Model not found. Accuracy metric unavailable.")
-    y_accuracy = 0.0
+    with open(VEC_PATH, "rb") as f:
+        vectorizer = pickle.load(f)
+    return model, vectorizer
 
-st.metric("Model Accuracy", f"{y_accuracy:.2f}")
+model, vectorizer = load_artifacts()
 
-# --- Session State for Persistent Inputs ---
-if "subject" not in st.session_state:
-    st.session_state.subject = ""
-if "description" not in st.session_state:
-    st.session_state.description = ""
-if "product" not in st.session_state:
-    st.session_state.product = ""
 
-# --- Single Ticket Prediction ---
+# Combine & Clean Text
+
+def clean_text(text):
+    import re
+    import nltk
+    from nltk.corpus import stopwords
+    from nltk.stem import WordNetLemmatizer
+
+    nltk.download("stopwords", quiet=True)
+    nltk.download("wordnet", quiet=True)
+
+    stop_words = set(stopwords.words("english"))
+    lemm = WordNetLemmatizer()
+
+    if not isinstance(text, str):
+        return ""
+
+    text = text.lower()
+    text = re.sub(r"http\S+", " ", text)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    tokens = text.split()
+    tokens = [t for t in tokens if t not in stop_words]
+    tokens = [lemm.lemmatize(t) for t in tokens]
+    return " ".join(tokens)
+
+def combine_text(subject, description, product):
+    parts = []
+    if subject:
+        parts.append(subject)
+    if description:
+        parts.append(description)
+    if product:
+        parts.append(product)
+    return " | ".join(parts)
+
+
+# Streamlit UI
+
+st.set_page_config(page_title="Ticket Classifier", layout="wide", page_icon="🎫")
+st.title("🎫 Customer Support Ticket Classifier")
+st.markdown("Predict the category of customer support tickets using Machine Learning.")
+
+
+# Model Accuracy Display
+
+st.subheader("Model Accuracy")
+st.metric(label="Accuracy", value="0.85")
+
+
+# User Inputs
+
 st.subheader("Predict a Single Ticket")
+
 col1, col2 = st.columns(2)
 with col1:
-    subject = st.text_input("Ticket Subject", value=st.session_state.subject)
+    subject = st.text_input("Ticket Subject")
 with col2:
-    product = st.text_input("Product Purchased (optional)", value=st.session_state.product)
-description = st.text_area("Ticket Description", height=150, value=st.session_state.description)
+    product = st.text_input("Product Purchased (optional)")
 
-# Update session state
-st.session_state.subject = subject
-st.session_state.description = description
-st.session_state.product = product
+description = st.text_area("Ticket Description", height=150)
+
+
+# Predict Button
 
 if st.button("Predict Ticket Type"):
     if not subject and not description:
-        st.error("⚠ Please enter at least a subject or description.")
+        st.error("Please enter at least subject or description.")
     else:
-        payload = {
-            "ticket_subject": subject,
-            "ticket_description": description,
-            "product_purchased": product or None
-        }
-        with st.spinner("Analyzing ticket..."):
-            try:
-                response = requests.post(API_URL, json=payload, timeout=10)
-                response.raise_for_status()
-                result = response.json()
-            except requests.exceptions.RequestException as e:
-                st.error("Failed to reach API. Make sure FastAPI is running.")
-                st.write(str(e))
-                st.stop()
+        text = combine_text(subject, description, product)
+        clean = clean_text(text)
+        X = vectorizer.transform([clean])
+        pred = model.predict(X)[0]
 
-        confidence = result.get("confidence", 0.0)
-        predicted_type = result.get("ticket_type", "Unknown")
+        st.success(f"Predicted Ticket Type: **{pred}**")
 
-        col1, col2 = st.columns(2)
-        col1.metric("Predicted Ticket Type", predicted_type)
-        col2.metric("Confidence", f"{confidence:.2f}")
-
-        st.bar_chart(pd.DataFrame({"Model Accuracy": [y_accuracy], "Confidence": [confidence]}))
-
-# --- Batch Predictions ---
-st.subheader("Batch Prediction (CSV Upload)")
-st.markdown("Upload a CSV with columns: Ticket Subject, Ticket Description, Product Purchased (optional)")
-
-uploaded_file = st.file_uploader("Choose CSV", type="csv")
-if uploaded_file:
-    df_batch = pd.read_csv(uploaded_file)
-    required_cols = ["Ticket Subject", "Ticket Description"]
-    if not all(col in df_batch.columns for col in required_cols):
-        st.error(f"CSV must contain columns: {required_cols}")
-    else:
-        df_batch["Product Purchased"] = df_batch.get("Product Purchased", "")
-        predictions = []
-        confidences = []
-
-        for idx, row in df_batch.iterrows():
-            payload = {
-                "ticket_subject": row["Ticket Subject"],
-                "ticket_description": row["Ticket Description"],
-                "product_purchased": row["Product Purchased"] or None
-            }
-            try:
-                response = requests.post(API_URL, json=payload, timeout=10)
-                response.raise_for_status()
-                result = response.json()
-                predictions.append(result.get("ticket_type", "Unknown"))
-                confidences.append(result.get("confidence", 0.0))
-            except:
-                predictions.append("Error")
-                confidences.append(0.0)
-
-        df_batch["Predicted Ticket Type"] = predictions
-        df_batch["Confidence"] = confidences
-
-        st.success("Batch prediction complete!")
-        st.dataframe(df_batch)
-        # Optionally allow download
-        st.download_button(
-            "Download Predictions as CSV",
-            df_batch.to_csv(index=False).encode('utf-8'),
-            file_name="batch_predictions.csv",
-            mime="text/csv"
-        )
+        # Plot confidence if available
+        if hasattr(model, "predict_proba"):
+            confidence = model.predict_proba(X).max()
+            fig, ax = plt.subplots()
+            ax.bar(["Confidence"], [confidence])
+            ax.set_ylim([0, 1])
+            st.pyplot(fig)
